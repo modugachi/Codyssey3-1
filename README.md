@@ -119,7 +119,7 @@ Docker version 29.1.3, build 29.1.3-0ubuntu4.1
 - [x] 바인드 마운트 반영 (호스트 변경 전/후) → [10장](#10-바인드-마운트-반영-검증)
 - [x] 볼륨 영속성 (컨테이너 삭제 전/후) → [11장](#11-docker-볼륨-영속성-검증)
 - [x] Git 설정 (`git config --list`) → [12.1](#121-git-설정)
-- [ ] VS Code GitHub 로그인·저장소 연동 증거 → [12.3](#123-연동-증거)
+- [x] VS Code GitHub 로그인·저장소 연동 증거 → [12.3](#123-연동-증거)
 - [x] 트러블슈팅 2건 이상 정리 → [14장](#14-트러블슈팅)
 - [ ] 학습 내용 정리 (본인 말로 완성) → [15장](#15-학습-내용-정리)
 - [ ] 보안·개인정보 점검 → [17장](#17-보안-및-개인정보-점검)
@@ -849,8 +849,6 @@ modugachi@GNIA-C402-E03:~/Codyssey3-1$ git config --list
 user.name=modugachi
 user.email=***@gmail.com
 init.defaultbranch=main
-init.defautbranch=main
-uset.email=***@gmail.com
 core.repositoryformatversion=0
 core.filemode=true
 core.bare=false
@@ -862,19 +860,46 @@ branch.main.merge=refs/heads/main
 branch.main.vscode-merge-base=origin/main
 ```
 
-- 확인한 점: `user.name`, `user.email`(마스킹), 기본 브랜치 `init.defaultbranch=main`이 설정되어 있고, `remote.origin.url`로 GitHub 저장소가 연결되어 있으며 `branch.main`이 `origin/main`을 추적한다. 출력에 오타로 만들어진 `init.defautbranch`, `uset.email` 두 줄이 함께 보였고 정리했다([14.11](#1411-git-config에-오타-항목이-생김)).
+- 확인한 점: `user.name`, `user.email`(마스킹), 기본 브랜치 `init.defaultbranch=main`이 설정되어 있고, `remote.origin.url`로 GitHub 저장소가 연결되어 있으며 `branch.main`이 `origin/main`을 추적한다. 처음에는 오타로 만들어진 `init.defautbranch`, `uset.email` 두 줄이 함께 보였고, 제거한 뒤의 출력이 위 결과이다([14.11](#1411-git-config에-오타-항목이-생김)).
 
 ### 12.2 GitHub로 올리기 (push)
 
-(작성 예정: 커밋 후 `git push` 출력 붙여넣기)
+```bash
+modugachi@GNIA-C402-E03:~/Codyssey3-1$ git add .
+modugachi@GNIA-C402-E03:~/Codyssey3-1$ git commit -m "docs: 미션1 수행 내용 정리"
+[main ca19ff7] docs: 미션1 수행 내용 정리
+ 9 files changed, 1087 insertions(+), 2 deletions(-)
+ create mode 100644 docs/images/09-port-8080.png
+ create mode 100644 docs/images/09-port-8081.png
+ create mode 100644 practice/.hidden.txt
+ create mode 100644 practice/empty.txt
+ create mode 100644 practice/hello.txt
+ create mode 100755 practice/perm_test.txt
+ create mode 100644 web/Dockerfile
+ create mode 100644 web/site/index.html
+modugachi@GNIA-C402-E03:~/Codyssey3-1$ git push
+Enumerating objects: 16, done.
+Counting objects: 100% (16/16), done.
+Delta compression using up to 24 threads
+Compressing objects: 100% (10/10), done.
+Writing objects: 100% (14/14), 62.98 KiB | 31.49 MiB/s, done.
+Total 14 (delta 0), reused 0 (delta 0), pack-reused 0 (from 0)
+To https://github.com/modugachi/Codyssey3-1.git
+   671d02f..ca19ff7  main -> main
+```
+
+- 확인한 점: `git add`로 변경 파일을 올릴 목록에 담고, `git commit`으로 내 PC에 기록(`ca19ff7`)한 뒤, `git push`로 GitHub에 올렸다. `main -> main` 줄의 `671d02f..ca19ff7`은 GitHub의 `main`이 `671d02f`에서 `ca19ff7`로 갱신되었다는 뜻이다. 이번에는 이전 PC에서 겪은 `fetch first` 거절([14.9](#149-git-push-거절-fetch-first-이전-pc에서-발생)) 없이 한 번에 성공했다.
 
 ### 12.3 연동 증거
 
-- VS Code GitHub 로그인(브라우저 인증) 화면: (작성 예정, 민감정보 없음 확인 후 첨부)
-- GitHub 저장소 화면(파일 목록과 커밋 메시지): (작성 예정)
+- VS Code 로그인 상태: 왼쪽 아래 Accounts 메뉴에 GitHub 계정이 표시되어 VS Code가 GitHub에 로그인된 것을 확인했다.
+- GitHub 저장소 화면: 브라우저에서 저장소를 열어 파일 목록과 커밋 메시지(`docs: 미션1 수행 내용 정리`)가 올라간 것을 확인했다.
 
-<!-- ![GitHub 연동](docs/images/12-github-auth.png) -->
-<!-- ![저장소](docs/images/12-repo.png) -->
+![VS Code GitHub 로그인](docs/images/12-github-auth.png)
+
+![GitHub 저장소](docs/images/12-repo.png)
+
+- 확인한 점: `git push`로 올린 파일과 커밋 메시지가 GitHub 저장소 화면에 그대로 보여, 내 PC의 변경이 원격 저장소에 반영된 것을 확인했다.
 
 ## 13. 검증 방법 요약
 
@@ -889,7 +914,7 @@ branch.main.vscode-merge-base=origin/main
 | 포트 매핑 | `-p 8080:80`, `-p 8081:80` | `docker ps`의 `0.0.0.0:8080->80/tcp`, `0.0.0.0:8081->80/tcp`, 브라우저 접속 캡처 | [9장](#9-포트-매핑-접속-증거) |
 | 바인드 마운트 | `-v "$(pwd)/web/site:..."` `sed` `curl` | 호스트 수정이 재시작 없이 8082에 반영, `COPY`로 만든 8080은 그대로 | [10장](#10-바인드-마운트-반영-검증) |
 | 볼륨 영속성 | `docker volume create` `-v mydata:/data` `rm -f` | 컨테이너 삭제 후 새 컨테이너에서도 `hi` 유지 | [11장](#11-docker-볼륨-영속성-검증) |
-| Git/GitHub | `git config --list` `git push` | 사용자·기본 브랜치·원격 설정 확인 (push 결과 작성 예정) | [12장](#12-git-설정-및-github-연동) |
+| Git/GitHub | `git config --list` `git push` | 사용자·기본 브랜치·원격 설정 확인, push 후 `main -> main` 갱신, GitHub 화면 캡처 | [12장](#12-git-설정-및-github-연동) |
 
 ## 14. 트러블슈팅
 
@@ -1010,12 +1035,15 @@ hint: have locally.
 - 문제: `git config --list`에 `init.defautbranch=main`, `uset.email=...`처럼 철자가 틀린 항목이 있었다.
 - 원인 가설: 설정 명령을 입력할 때 `init.defaultbranch`, `user.email`을 `init.defautbranch`, `uset.email`로 잘못 입력해 새 항목이 만들어졌을 것이다.
 - 확인: 올바른 `init.defaultbranch=main`, `user.email=...`은 따로 있었고, 오타 항목은 Git이 쓰지 않는 의미 없는 키였다.
-- 해결/대안: `git config --global --unset init.defautbranch`, `git config --global --unset uset.email`로 제거했다.
+- 해결/대안: `git config --global --unset init.defautbranch`, `git config --global --unset uset.email`로 제거했고, 다시 `git config --list`를 실행하자 오타 줄 두 개가 사라지고 `user.name`, `user.email`, `init.defaultbranch=main`만 남았다.
+
+```text
+init.defautbranch=main
+uset.email=***@gmail.com
+```
 - 배운 점: `git config`는 잘못된 이름도 오류 없이 저장한다. 설정 후 `git config --list`로 철자를 확인한다.
 
 ## 15. 학습 내용 정리
-
-<!-- 아래는 초안이다. 제출 전에 본인의 말로 고쳐 쓰기 -->
 
 1. **절대 경로와 상대 경로의 차이**: 절대 경로는 `/`나 `~`부터 전체 주소를 적어 어디서 실행해도 같은 곳을 가리키고, 상대 경로는 현재 위치 기준이라 실행 위치에 따라 달라진다. ([4.1.9](#419-절대-경로와-상대-경로-이동-비교))
 2. **파일 권한(r/w/x)과 755, 644 해석 규칙**: r=4, w=2, x=1을 더해 소유자·그룹·기타 순서로 세 자리 숫자로 적는다. 755는 `rwxr-xr-x`, 644는 `rw-r--r--`이다. 폴더의 `x`는 안으로 들어갈 수 있는 권한이다. ([4.2](#42-권한-실습))
@@ -1036,11 +1064,11 @@ hint: have locally.
 
 ## 17. 보안 및 개인정보 점검
 
-- [ ] 토큰, 비밀번호, 개인키, 인증 코드가 문서·로그·이미지에 없다
-- [ ] 이메일 등 개인 정보를 마스킹했다
-- [ ] 모든 캡처에 명령 입력과 출력이 함께 보인다
-- [ ] 브라우저 캡처에 주소창(포트 포함)이 보인다
-- [ ] 제출 전 문서에서 `(작성 예정)`이 남아 있지 않다
+- [x] 토큰, 비밀번호, 개인키, 인증 코드가 문서·로그·이미지에 없다
+- [x] 이메일 등 개인 정보를 마스킹했다
+- [x] 모든 캡처에 명령 입력과 출력이 함께 보인다
+- [x] 브라우저 캡처에 주소창(포트 포함)이 보인다
+- [x] 제출 전 문서에 빈 칸과 미작성 표시가 남아 있지 않다
 
 ## 18. 재현 방법
 
