@@ -915,6 +915,7 @@ To https://github.com/modugachi/Codyssey3-1.git
 | 바인드 마운트 | `-v "$(pwd)/web/site:..."` `sed` `curl` | 호스트 수정이 재시작 없이 8082에 반영, `COPY`로 만든 8080은 그대로 | [10장](#10-바인드-마운트-반영-검증) |
 | 볼륨 영속성 | `docker volume create` `-v mydata:/data` `rm -f` | 컨테이너 삭제 후 새 컨테이너에서도 `hi` 유지 | [11장](#11-docker-볼륨-영속성-검증) |
 | Git/GitHub | `git config --list` `git push` | 사용자·기본 브랜치·원격 설정 확인, push 후 `main -> main` 갱신, GitHub 화면 캡처 | [12장](#12-git-설정-및-github-연동) |
+| 포트 충돌 진단 | `docker run -p 8080:80`(중복) `docker ps --filter "publish=8080"` `ss -ltnp` | `port is already allocated`로 실패, 점유 컨테이너 확인, 8083으로 변경해 해결 | [14.12](#1412-포트-충돌-port-is-already-allocated) |
 
 ## 14. 트러블슈팅
 
@@ -1042,6 +1043,80 @@ init.defautbranch=main
 uset.email=***@gmail.com
 ```
 - 배운 점: `git config`는 잘못된 이름도 오류 없이 저장한다. 설정 후 `git config --list`로 철자를 확인한다.
+### 14.12 포트 충돌 (port is already allocated)
+
+- 재현 환경: Windows + WSL2 Ubuntu (`DESKTOP-G603NQD`), Docker 29.1.3 (apt `docker.io`)
+- 문제: 8080 포트를 `my-web-8080`이 쓰는 중에 같은 8080으로 컨테이너를 하나 더 실행하자 실패했다.
+
+```bash
+$ docker run -d -p 8080:80 --name my-web-8080 my-web:1.0
+28afeff6dababf6da4e630e6c9b9dc68499dff9c7d043e6f0a3f2a11c63621b8
+$ docker run -d -p 8080:80 --name my-web-conflict my-web:1.0
+64902ffa847cb6156726f18a05447c0db12a6cf30f1a70b541600d9d25e80980
+docker: Error response from daemon: failed to set up container networking: driver failed programming external connectivity on endpoint my-web-conflict (95173c72e8c5...): Bind for 0.0.0.0:8080 failed: port is already allocated
+```
+
+- 원인 가설: 호스트의 8080 포트는 한 번에 하나의 대상에만 연결될 수 있는데, 이미 `my-web-8080`이 쓰고 있어 충돌했을 것이다.
+- 확인: 실패한 컨테이너의 상태와 8080을 쓰는 대상을 아래 명령으로 확인했다.
+
+```bash
+$ docker ps -a
+CONTAINER ID   IMAGE        COMMAND                  CREATED          STATUS          PORTS                                     NAMES
+64902ffa847c   my-web:1.0   "/docker-entrypoint.…"   8 seconds ago    Created                                                   my-web-conflict
+28afeff6daba   my-web:1.0   "/docker-entrypoint.…"   24 seconds ago   Up 24 seconds   0.0.0.0:8080->80/tcp, [::]:8080->80/tcp   my-web-8080
+$ docker ps --filter "publish=8080"
+CONTAINER ID   IMAGE        COMMAND                  CREATED          STATUS          PORTS                                     NAMES
+28afeff6daba   my-web:1.0   "/docker-entrypoint.…"   30 seconds ago   Up 29 seconds   0.0.0.0:8080->80/tcp, [::]:8080->80/tcp   my-web-8080
+$ ss -ltnp | grep 8080
+LISTEN 0      4096          0.0.0.0:8080       0.0.0.0:*
+LISTEN 0      4096             [::]:8080          [::]:*
+```
+
+  `docker ps --filter "publish=8080"`으로 8080을 점유한 컨테이너가 `my-web-8080`임을 찾았고, `ss -ltnp`로 호스트에서 8080이 LISTEN 상태임을 확인했다. 실패한 `my-web-conflict`는 `Created` 상태로 남아 있었다.
+- 해결/대안: 점유한 `my-web-8080`은 그대로 두고, 남은 실패 컨테이너를 지운 뒤 호스트 포트를 `8083`으로 바꿔 다시 실행했다.
+
+```bash
+$ docker rm my-web-conflict
+my-web-conflict
+$ docker run -d -p 8083:80 --name my-web-conflict my-web:1.0
+24c3d7dd3cf3a31f37daab42087d0334fd391e284046e93bb32f82f4f67d37ca
+$ curl http://localhost:8083
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>My First Custom Image</title>
+</head>
+<body>
+<h1>코디세이 첫 번째 커스텀 이미지</h1>
+<p>이 페이지는 Dockerfile로 만든 컨테이너에서 서비스되고 있습니다.</p>
+</body>
+</html>
+$ docker rm -f my-web-conflict my-web-8080
+my-web-conflict
+my-web-8080
+$ docker ps -a
+CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
+```
+
+- 배운 점: 컨테이너 안의 포트와 달리 호스트 포트는 PC 전체에서 하나만 쓸 수 있다. 충돌이 나면 ① 오류 메시지의 `port is already allocated` 확인 → ② `docker ps --filter "publish=포트"`와 `ss -ltnp`로 점유자 확인 → ③ 다른 포트로 바꾸거나 점유자를 중지하는 순서로 해결한다. 점유자가 필요한 서비스면 끊지 말고 포트를 바꾸는 쪽이 안전하다. 컨테이너가 아닌 일반 프로그램이 포트를 쓰는 경우에는 `sudo ss -ltnp | grep 포트`로 프로세스 이름(PID)을 확인해 종료한다.
+
+### 14.13 컨테이너 이름 충돌 (Conflict. The container name is already in use)
+
+- 재현 환경: Windows + WSL2 Ubuntu (`DESKTOP-G603NQD`), Docker 29.1.3 (apt `docker.io`)
+- 문제: 실행 중인 `my-web-conflict`가 있는 상태에서 같은 이름으로 `docker run`을 하자 실패했다.
+
+```text
+$ docker rm my-web-conflict
+Error response from daemon: cannot remove container "my-web-conflict": container is running: stop the container before removing or force remove
+$ docker run -d -p 8083:80 --name my-web-conflict my-web:1.0
+docker: Error response from daemon: Conflict. The container name "/my-web-conflict" is already in use by container "ac81371be28f...". You have to remove (or rename) that container to be able to reuse that name.
+```
+
+- 원인 가설: 컨테이너 이름은 중복될 수 없는데, 이전에 만든 컨테이너가 남아 있다.
+- 확인: `docker rm`은 실행 중인 컨테이너라서 거부되었다. 이때 실패한 `curl http://localhost:8083`은 `Failed to connect`였다.
+- 해결/대안: `docker rm -f my-web-conflict`로 강제 삭제한 뒤 `docker ps -a`가 비는 것을 확인하고 다시 실행했다. (`docker stop` 후 `docker rm`도 가능하다.)
+- 배운 점: 이름은 컨테이너마다 하나만 쓸 수 있고, 종료되거나 `Created` 상태인 컨테이너도 이름을 점유한다. 실행 중인 컨테이너는 먼저 `stop`하거나 `rm -f`를 쓴다.
 
 ## 15. 학습 내용 정리
 
@@ -1072,8 +1147,7 @@ uset.email=***@gmail.com
 
 ## 18. 재현 방법
 
-**사전 조건**: Docker와 Git이 설치되어 있어야 한다. (Windows는 WSL2 Ubuntu 터미널 기준)
-
+**사전 체크**: 8080, 8081 포트가 비어 있는지 `ss -ltn | grep -E ':8080|:8081'`로 확인한다. 출력이 있으면 이미 사용 중이므로 다른 포트로 바꾼다 ([14.12](#1412-포트-충돌-port-is-already-allocated) 참고).
 ```bash
 git clone https://github.com/modugachi/Codyssey3-1.git
 cd Codyssey3-1
